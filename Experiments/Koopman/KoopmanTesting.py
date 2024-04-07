@@ -163,8 +163,9 @@ class koopman:
 
 
 
-kpm = koopman()
-kpm.compute_variable_sequence()
+if __name__ == '__main__':
+    kpm = koopman()
+    kpm.compute_variable_sequence()
 
 
 
