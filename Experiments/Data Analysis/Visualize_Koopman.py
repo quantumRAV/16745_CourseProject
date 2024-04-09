@@ -89,9 +89,9 @@ controls = ["commanded_closure_pressure_psi","commanded_x_mm"," commanded_y_mm"]
 control_data = np.array(DF.loc[train_idx,controls]).T #need one less control than than state
 
 #from the states, create the observables
-n_delay = 5
+n_delay = 2
 ob1 = pk.observables.Identity()
-ob2 = pk.observables.Polynomial(degree=4)
+ob2 = pk.observables.Polynomial(degree=3)
 ob3 = pk.observables.TimeDelay(delay = 1, n_delays = n_delay)
 obs = ob1 + ob2 + ob3
 
@@ -101,7 +101,7 @@ obs = ob1 + ob2 + ob3
 #Fit koopman
 EDMDc = pk.regression.EDMDc()
 #model = pk.Koopman(observables = obs, regressor = EDMDc)
-model = pk.Koopman(observables = ob1+ob2, regressor = EDMDc)
+model = pk.Koopman(observables = ob1, regressor = EDMDc)
 
 #model.fit(x= state_data[:,n_delay:-1].T, y = state_data[:,n_delay+1:].T,u = control_data[:,n_delay:-1].T)
 model.fit(x= state_data[:,0:-1].T, u = control_data[:,0:-1].T)
@@ -128,7 +128,7 @@ DF = pd.DataFrame.merge(DF,newDF,left_index=True,right_index=True)
 DF_melt7 = DF.melt(id_vars=['corrected_time_s','sequence_num',"Train_or_Test"],
                         value_vars=['P_jaw1_psi', 'P_jaw2_psi','P_jaw3_psi', 'P_jaw1_psi_prediction','P_jaw2_psi_prediction','P_jaw3_psi_prediction'],var_name = 'Variable',value_name ='Values')
 
-fig7 = px.line(DF_melt7,x = 'corrected_time_s',y = 'Values', color = "sequence_num", symbol = "sequence_num",facet_row = 'Variable')
+fig7 = px.line(DF_melt7,x = 'corrected_time_s',y = 'Values', color = "sequence_num", symbol = "sequence_num",facet_row = 'Variable',facet_col = "Train_or_Test")
 fig7.update_yaxes(range=[0, 1])
 fig7.show()
 
