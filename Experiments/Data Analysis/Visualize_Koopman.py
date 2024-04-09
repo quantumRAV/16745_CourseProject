@@ -19,11 +19,11 @@ DF["corrected_time_s"] = corrected_time
 
 
 
-## ---- Plot the states (jaw pressures) and controls (x,y and the commanded grasper pressure) as functions of time, colored by the sequence number, time not corrected
-DF_melt0 = DF.melt(id_vars=['time_delta_s','sequence_num'],
-                        value_vars=['P_jaw1_psi', 'P_jaw2_psi','P_jaw3_psi','x_mm','y_mm','P_closure_psi',
-                                    'commanded_x_mm',' commanded_y_mm','commanded_closure_pressure_psi'],var_name = 'Variable',value_name ='Values')
-
+# ## ---- Plot the states (jaw pressures) and controls (x,y and the commanded grasper pressure) as functions of time, colored by the sequence number, time not corrected
+# DF_melt0 = DF.melt(id_vars=['time_delta_s','sequence_num'],
+#                         value_vars=['P_jaw1_psi', 'P_jaw2_psi','P_jaw3_psi','x_mm','y_mm','P_closure_psi',
+#                                     'commanded_x_mm',' commanded_y_mm','commanded_closure_pressure_psi'],var_name = 'Variable',value_name ='Values')
+#
 # fig0 = px.line(DF_melt0,x = 'time_delta_s',y = 'Values', color = "sequence_num", symbol = "sequence_num",facet_row = 'Variable')
 # fig0.update_yaxes(matches = None, showticklabels=True)
 # fig0.show()
@@ -110,8 +110,25 @@ model.fit(x= state_data[:,0:-1].T, u = control_data[:,0:-1].T)
 
 #---- Validate ---#
 # add column for prediction, whether is train or test
+DF["Prediction"] = np.nan
+DF["Train_or_Test"] = "Train"
 for k in uniqSeq:
     idx = np.array([x==k for x in DF["sequence_num"]])
     nidx = np.where(idx == True)[0]
     num_steps = np.size(nidx)
     Xkoop = model.simulate(DF.loc[nidx[0],states].to_numpy(), DF.loc[nidx,controls].to_numpy(), n_steps=(num_steps))
+    DF.loc[nidx,"Prediction"] = pd.Series(list(Xkoop),index = nidx)
+    DF.loc[nidx,"Train_or_Test"] = "Train" if k in train_seq else "Test"
+
+#expand column with list of koopman prediction to prediction of state variables
+predict_state_names=[x+"_prediction" for x in states]
+newDF = DF[["Prediction"]].apply(lambda x:  pd.Series([v for lst in x for v in lst],index = predict_state_names), axis=1, result_type="expand")
+DF = pd.DataFrame.merge(DF,newDF,left_index=True,right_index=True)
+
+DF_melt7 = DF.melt(id_vars=['corrected_time_s','sequence_num',"Train_or_Test"],
+                        value_vars=['P_jaw1_psi', 'P_jaw2_psi','P_jaw3_psi', 'P_jaw1_psi_prediction','P_jaw2_psi_prediction','P_jaw3_psi_prediction'],var_name = 'Variable',value_name ='Values')
+
+fig7 = px.line(DF_melt7,x = 'corrected_time_s',y = 'Values', color = "sequence_num", symbol = "sequence_num",facet_row = 'Variable')
+fig7.update_yaxes(range=[0, 1])
+fig7.show()
+
