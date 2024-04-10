@@ -101,10 +101,10 @@ obs = ob1 + ob2 + ob3
 #Fit koopman
 EDMDc = pk.regression.EDMDc()
 #model = pk.Koopman(observables = obs, regressor = EDMDc)
-model = pk.Koopman(observables = ob1, regressor = EDMDc)
+model = pk.Koopman(observables = ob1 + ob3, regressor = EDMDc)
 
 #model.fit(x= state_data[:,n_delay:-1].T, y = state_data[:,n_delay+1:].T,u = control_data[:,n_delay:-1].T)
-model.fit(x= state_data[:,0:-1].T, u = control_data[:,0:-1].T)
+model.fit(x= state_data[:,0:-1].T, u = control_data[:,n_delay:-1].T)
 #Xkoop = model.simulate(x, u[:, np.newaxis], n_steps=n_int-1)
 
 
