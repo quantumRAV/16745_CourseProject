@@ -18,7 +18,7 @@ corrected_time = DF.loc[:,["time_delta_s","sequence_num"]].groupby(['sequence_nu
 DF["corrected_time_s"] = corrected_time
 
 
-
+#
 # ## ---- Plot the states (jaw pressures) and controls (x,y and the commanded grasper pressure) as functions of time, colored by the sequence number, time not corrected
 # DF_melt0 = DF.melt(id_vars=['time_delta_s','sequence_num'],
 #                         value_vars=['P_jaw1_psi', 'P_jaw2_psi','P_jaw3_psi','x_mm','y_mm','P_closure_psi',
@@ -89,10 +89,11 @@ controls = ["commanded_closure_pressure_psi","commanded_x_mm"," commanded_y_mm"]
 control_data = np.array(DF.loc[train_idx,controls]).T #need one less control than than state
 
 #from the states, create the observables
-n_delay = 2
+n_delay = 3
+delay_mag = 1
 ob1 = pk.observables.Identity()
 ob2 = pk.observables.Polynomial(degree=3)
-ob3 = pk.observables.TimeDelay(delay = 1, n_delays = n_delay)
+ob3 = pk.observables.TimeDelay(delay = delay_mag, n_delays = n_delay)
 obs = ob1 + ob2 + ob3
 
 
@@ -101,10 +102,10 @@ obs = ob1 + ob2 + ob3
 #Fit koopman
 EDMDc = pk.regression.EDMDc()
 #model = pk.Koopman(observables = obs, regressor = EDMDc)
-model = pk.Koopman(observables = ob1 + ob3, regressor = EDMDc)
+model = pk.Koopman(observables = ob1+ob3, regressor = EDMDc)
 
 #model.fit(x= state_data[:,n_delay:-1].T, y = state_data[:,n_delay+1:].T,u = control_data[:,n_delay:-1].T)
-model.fit(x= state_data[:,0:-1].T, u = control_data[:,n_delay:-1].T)
+model.fit(x= state_data[:,0:-1].T, u = control_data[:,n_delay*delay_mag:-1].T)
 #Xkoop = model.simulate(x, u[:, np.newaxis], n_steps=n_int-1)
 
 
@@ -116,7 +117,17 @@ for k in uniqSeq:
     idx = np.array([x==k for x in DF["sequence_num"]])
     nidx = np.where(idx == True)[0]
     num_steps = np.size(nidx)
-    Xkoop = model.simulate(DF.loc[nidx[0],states].to_numpy(), DF.loc[nidx,controls].to_numpy(), n_steps=(num_steps))
+
+    state_start_idx = (nidx[0] - (n_delay * delay_mag))
+    if state_start_idx < 0: #for the case where there is no time history
+        # Xkoop = model.simulate(DF.loc[nidx[0],states].to_numpy(), DF.loc[nidx,controls].to_numpy(), n_steps=(num_steps)) # this is for the case where there are no time delays.  If there are, need to do something more sophisticated...
+        augmented_states = DF.loc[np.repeat(nidx[0:1],n_delay+1), states]
+        Xkoop = model.simulate(augmented_states.to_numpy(),
+                               DF.loc[nidx, controls].to_numpy(), n_steps=(num_steps))
+        print("Not enough data to augment sequence %i, need to augment"%k)
+    else:
+        Xkoop = model.simulate(DF.loc[state_start_idx:(nidx[0]), states].to_numpy(), DF.loc[nidx, controls].to_numpy(), n_steps=(num_steps)) #need the time delayed state and current state as initial conditions, but need to define controls for all the time points
+
     DF.loc[nidx,"Prediction"] = pd.Series(list(Xkoop),index = nidx)
     DF.loc[nidx,"Train_or_Test"] = "Train" if k in train_seq else "Test"
 
