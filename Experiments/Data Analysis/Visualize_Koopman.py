@@ -21,7 +21,7 @@ DF = pd.read_csv("Koopman Data/Koopman_Testing_06_04_2024_10_04_48.csv")
 corrected_time = DF.loc[:,["time_delta_s","sequence_num"]].groupby(['sequence_num']).transform(lambda x: (x-x.iloc[0]))
 DF["corrected_time_s"] = corrected_time
 
-DF = DF.query("corrected_time_s<1")
+DF = DF.query("corrected_time_s<2")
 DF = DF.reset_index()
 #
 # ## ---- Plot the states (jaw pressures) and controls (x,y and the commanded grasper pressure) as functions of time, colored by the sequence number, time not corrected
@@ -104,6 +104,16 @@ ob3 = pk.observables.TimeDelay(delay = delay_mag, n_delays = n_delay)
 obs = ob1 + ob2 + ob3
 
 useTimeDelay = False
+
+#---- DMD ----#
+dt = 1/16
+dmd = DMD(svd_rank = 10)
+dmd.fit(state_data)
+print(
+    f"Frequencies (imaginary component): {np.round(np.log(dmd.eigs) / dt, decimals=12)}"
+)
+plot_summary(dmd)
+
 
 #---- Koopman ---#
 #Fit koopman
