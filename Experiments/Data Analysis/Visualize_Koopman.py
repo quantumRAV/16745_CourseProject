@@ -86,7 +86,7 @@ test_idx = [x in test_seq for x in DF["sequence_num"]]
 
 #get the states
 
-states =["P_jaw1_psi","P_jaw2_psi","P_jaw3_psi","x_mm","y_mm"]
+states =["P_jaw1_psi","P_jaw2_psi","P_jaw3_psi"]#,"x_mm","y_mm"]
 
 #states =["P_jaw1_psi","P_jaw2_psi","P_jaw3_psi"]
 state_data = np.array(DF.loc[train_idx,states]).T #will be an ns x n_t matrix, where ns is the number of states, n_t is the number of datapoints
