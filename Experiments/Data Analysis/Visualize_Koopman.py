@@ -21,7 +21,7 @@ DF = pd.read_csv("Koopman Data/Koopman_Testing_06_04_2024_10_04_48.csv")
 corrected_time = DF.loc[:,["time_delta_s","sequence_num"]].groupby(['sequence_num']).transform(lambda x: (x-x.iloc[0]))
 DF["corrected_time_s"] = corrected_time
 
-DF = DF.query("corrected_time_s<2")
+DF = DF.query("corrected_time_s<15>")
 DF = DF.reset_index()
 #
 # ## ---- Plot the states (jaw pressures) and controls (x,y and the commanded grasper pressure) as functions of time, colored by the sequence number, time not corrected
@@ -120,7 +120,7 @@ plot_summary(dmd)
 EDMDc = pk.regression.EDMDc()
 #model = pk.Koopman(observables = obs, regressor = EDMDc)
 if useTimeDelay:
-    model = pk.Koopman(observables = ob1+ob3+ob2, regressor = EDMDc)
+    model = pk.Koopman(observables = ob1+ob2, regressor = EDMDc)
     model.fit(x=state_data[:, 0:-1].T, u=control_data[:, n_delay * delay_mag:-1].T)
 
 else:
@@ -128,7 +128,24 @@ else:
     model.fit(x= state_data[:,0:-1].T, y = state_data[:,1:].T,u = control_data[:,0:-1].T)
 
 #Xkoop = model.simulate(x, u[:, np.newaxis], n_steps=n_int-1)
+#---- Validate on entire Time Series ----#
+if useTimeDelay:
+    Xkoop_total = model.simulate(DF.loc[0:n_delay*delay_mag, states].to_numpy(), DF.loc[:, controls].to_numpy(), n_steps=(np.size(DF,0)))
 
+
+else:
+    Xkoop_total = model.simulate(DF.loc[0, states].to_numpy(), DF.loc[:, controls].to_numpy(), n_steps=(np.size(DF,0)))  # this is for the case where there are no time delays.  If there are, need to do something more sophisticated...
+
+
+fig_tot = go.Figure()
+fig_tot.add_trace(go.Scatter(x=DF["time_delta_s"], y=Xkoop_total[:,0],
+                         mode='lines',
+                         name='Actual'))
+fig_tot.add_trace(go.Scatter(x=DF["time_delta_s"], y=DF["P_jaw1_psi"],
+                             mode='lines',
+                             name='Sim'))
+
+fig_tot.show()
 
 #---- Validate ---#
 # add column for prediction, whether is train or test
