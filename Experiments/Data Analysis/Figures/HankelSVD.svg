@@ -27,9 +27,9 @@
      inkscape:cx="1178.8503"
      inkscape:cy="570.55807"
      inkscape:window-width="1920"
-     inkscape:window-height="1052"
+     inkscape:window-height="1080"
      inkscape:window-x="0"
-     inkscape:window-y="28"
+     inkscape:window-y="0"
      inkscape:window-maximized="0"
      inkscape:current-layer="g1"><inkscape:page
        x="0"
@@ -62,7 +62,10 @@
        d="M 0,0 H 514 V 420 H 0 Z"
        style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none"
        transform="translate(151,318)"
-       clip-path="url(#clipPath2)" /><path
+       clip-path="url(#clipPath2)"
+       inkscape:export-filename="HankelSVD.png"
+       inkscape:export-xdpi="600"
+       inkscape:export-ydpi="600" /><path
        id="path3"
        d="M 0,0 H 514 V 420 H 0 Z"
        style="fill:#ffffff;fill-opacity:1;fill-rule:nonzero;stroke:none"
