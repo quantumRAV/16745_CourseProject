@@ -40,6 +40,7 @@ jaw3_pressure = test_data(2:end, 16);
 
 % TODO: read in x and y positions (for when/if we incorporate this)
 
+
 %% Formatting Data
 % many options for how to shape the data here, let's start with the
 % standard big boi of stacking the states where each col is a timestep
@@ -63,6 +64,10 @@ gen_U_k1 = gen_U(:, 1:end-1);
 gen_X_k1 = gen_X(:, 1:end-1);
 gen_X_k2 = gen_X(:, 2:end);
 
+% build a time array to accompany the data
+dt = 1/16;
+t_start = dt;
+gen_time = t_start + (0:gen_nm-2)*dt;
 %% No Time Delay Embedding or Data Parsing
 % First check of our process/approach and functions. Plugging all of our
 % data naively into the Dynamics_Mat_Reg function should result in a linear
@@ -83,16 +88,16 @@ gen_X_k2 = gen_X(:, 2:end);
 % Time_Delay_Embed(matrix_to_delay, number of delays)
 % parameters to tweak -> number of delays used
 
-delays = 1:10; % some delays to try
+delays = 1:8; % some delays to try
 
 % need to store our different time delay embeddings
 gen_X_k1_delays = cell(1, length(delays));
-gen_X_k2_delays = cell(1, length(delays));
+gen_X_k2_delays = cell(2, length(delays));
 gen_U_k1_delays = cell(1, length(delays));
 
 % somewhere to store the dynamics matrices that result from this time delay
 % embedding
-gen_dyn_matrices_delays = cell(1, length(delays));
+gen_dyn_matrices_delays = cell(2, length(delays));
 
 % generate time delay embedded matrices for varying quantities of time
 % delays
@@ -100,10 +105,18 @@ for i=1:length(delays)
     gen_X_k1_delays{1, i} = Time_Delay_Embed(gen_X_k1, delays(i));
     gen_X_k2_delays{1, i} = Time_Delay_Embed(gen_X_k2, delays(i));
     gen_U_k1_delays{1, i} = Time_Delay_Embed(gen_U_k1, delays(i));
+    
+    % each of these respective matrices has a slightly shifted time scale
+    % because increasing their quantity of delays shifts their first entry
+    % / creates some artificial 'latency'
+    gen_nm_delay = length(gen_X_k2_delays{1, i}(1,:));
+    t_start = dt*(gen_nm - gen_nm_delay); % ex 1 delay -> start at 2*dt
+    gen_X_k2_delays{2, i} = t_start+(0:gen_nm_delay-1)*dt;
 
     % fit dynamics matrices to these different sets of delays
-    gen_dyn_matrices_delays{1, i} = Dynamics_Mat_Reg(gen_X_k1_delays{1, i},...
-        gen_U_k1_delays{1, i}, gen_X_k2_delays{1, i},...
+    [gen_dyn_matrices_delays{1, i}, gen_dyn_matrices_delays{2, i}] = ... 
+        Dynamics_Mat_Reg(gen_X_k1_delays{1, i}, ...
+        gen_U_k1_delays{1, i}, gen_X_k2_delays{1, i}, ...
         gen_nx*(delays(i)+1), gen_nu*(delays(i)+1));
 end
 
@@ -163,11 +176,42 @@ end
 % of data before the system can do anything? maybe the answer is to couch
 % it at the start with steady state initial conditions...?
 
-%% Rollout A and B Matrix Calculation on Test Set
-% TODO: perform some validating rollout of the data forwards to see how the
-% A and B matrices do at recreating dynamic portions of the set aside test
-% sets (can build a X_test_lift and then compare it to the actual
-% X_test_lift+)?
+%% Rollout A and B Matrix Calculation
+% Perform some validating rollout of the data forwards to see how the
+% A and B matrices do at recreating the jaw pressures from experimental
+% data
+
+% naive, no time embed rollout
+gen_x_ic = gen_X_k1(:,1);
+gen_X_sim_k2 = Time_Embed_Forward_Rollout(naive_A, naive_B, gen_x_ic, gen_nx, gen_U_k1, 0);
+
+% rollout for different time delays
+gen_X_sim_k2_delays = cell(1, length(delays));
+for i=1:length(delays)
+    A_i = gen_dyn_matrices_delays{1, i}; % A matrix for proper delay qty
+    B_i = gen_dyn_matrices_delays{2, i}; % B matrix for proper delay qty
+    y_ic = gen_X_k1_delays{1, i}(:,1); % initial condition for given delay
+    u_i = gen_U_k1_delays{1, i}; % time delay embedded control traj
+    p_i = delays(i); % num delays used
+
+    gen_X_sim_k2_delays{1, i} = Time_Embed_Forward_Rollout(A_i, B_i, y_ic, gen_nx, u_i, p_i);
+end
+
+%% Plotting
+% plotting general data real vs simulated rollout from some fitted A and B
+figure
+plot(gen_time, gen_X_k2(1,:))
+hold on
+plot(gen_time, gen_X_sim_k2(1,:))
+%plot(gen_X_k2_delays{2,1}(1,:), gen_X_sim_k2_delays{1,1}(1,:))
+%plot(gen_time, gen_X_sim_k2_delays{1,5}(1,:))
+%plot(gen_time, gen_X_sim_k2_delays{1,10}(1,:))
+ylabel('Jaw 1 Pressure (psi)')
+xlabel('Time (s)')
+ax = gca;
+ax.FontSize = 22;
+legend('Experimental Data', '0 Time Delays', '1 Time Delay', '5 Time Delays', '10 Time Delays')
+hold off
 
 %% Calculation of a Static Gain
 % Akin to Haggerty, with static data separated, calculate a static gain to
