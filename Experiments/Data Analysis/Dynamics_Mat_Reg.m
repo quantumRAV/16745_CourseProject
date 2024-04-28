@@ -6,7 +6,7 @@ function [A, B] = Dynamics_Mat_Reg(X_k, U_k, X_k2, nx, nu)
 A = zeros(nx, nx);
 B = zeros(nx, nu);
 
-% need an identity matrix for the kronecker products
+% need an identity matrix for state vector of the kronecker products
 I = eye(nx, nx);
 
 % used to calculate qty of columns for the large set of kronecker products
@@ -23,13 +23,13 @@ x_k2_vector = zeros(nx*nm, 1);
 
 % fill the large kronecker matrix
 for k=1:nm % need to do some careful indexing here
-    x_start_pt = (k-1)*(kron_col_x+kron_col_u)+1;
-    u_start_pt = x_start_pt+kron_col_x;
+    %x_start_pt = (k-1)*(kron_col_x+kron_col_u)+1;
+    %u_start_pt = x_start_pt+kron_col_x;
 
     big_kron(nx*(k-1)+1:nx*k, 1:kron_col_x) = kron(X_k(:,k)',I); 
     big_kron(nx*(k-1)+1:nx*k, kron_col_x+1:kron_col_x+kron_col_u) = kron(U_k(:,k)',I);
 
-    % in this iter, probably can build up the sum of x_k2s
+    % in this iter, probably can stack up x_k2s
     x_k2_vector(nx*(k-1)+1:nx*k) = X_k2(:,k);
 end
 

@@ -79,6 +79,96 @@ gen_time = t_start + (0:gen_nm-2)*dt;
 % interpretation of how to solve these systems (ie is doing out the sum and
 % then my application of the least squares setup incorrect?)
 
+%% Non Partitioned Data w/ Time Delay Embedding (avoid kron and vec)
+% Time_Delay_Embed(matrix_to_delay, number of delays)
+% parameters to tweak -> number of delays used
+
+delays = 1:20; % some delays to try
+
+% need to store our different time delay embeddings
+gen_X_k1_delays = cell(1, length(delays));
+
+% should not time delay the controls - this cumulative effect should be
+% handled by the time delays on state. Do need to trim the length of the
+% vector so starting indices align with starting index of delayed state vec
+gen_U_k1_delays = cell(1, length(delays)); 
+
+% Similarly, w/ imposed identity and sizing on our matrix, can get away
+% with trimming the x_k+1 vector
+gen_X_k2_delays = cell(2, length(delays)); % second row is for time
+
+% somewhere to store the dynamics matrices that result from this time delay
+% embedding
+gen_dyn_matrices_delays = cell(2, length(delays));
+
+% generate time delay embedded matrices for varying quantities of time
+% delays
+for i=1:length(delays)
+    gen_X_k1_delays{1, i} = Time_Delay_Embed(gen_X_k1, delays(i));
+    
+    % don't employ time delay embedding on the control input, but we do
+    % need to trim the vector based on qty of delays (ie if 1 delay, first
+    % x_k will be x_2 so similarly we need to update to use u_2 for start)
+    gen_U_k1_delays{1, i} = gen_U_k1(:, delays(i)+1:end);
+    
+    % stack the u_k on top of the time delay x_k
+    state_ctrl = [gen_U_k1_delays{1, i}; gen_X_k1_delays{1, i}];
+
+    % similar trimming for x_k2
+    gen_X_k2_delays{1, i} = gen_X_k2(:, delays(i)+1:end);
+    X_k2_T = gen_X_k2_delays{1, i}';
+
+    gen_dyn_matrices_delays{1, i} = linsolve(state_ctrl',X_k2_T);
+    
+    % transpose this for convenience
+    gen_dyn_matrices_delays{1, i} = gen_dyn_matrices_delays{1, i}';
+
+    % each of these respective matrices has a slightly shifted time scale
+    % because increasing their quantity of delays shifts their first entry
+    % / creates some artificial 'latency'
+    gen_nm_delay = length(gen_X_k2_delays{1, i}(1,:));
+    t_start = dt*(gen_nm - gen_nm_delay); % ex 1 delay -> start at 2*dt
+    gen_X_k2_delays{2, i} = t_start+(0:gen_nm_delay-1)*dt;    
+end
+
+
+%% Rolling this version out
+x_ic = gen_X_k1_delays{1,1}(:,1);
+X_k2_sim_test1 = Delay_no_kron_Forward_Rollout(gen_dyn_matrices_delays{1,1},...
+    x_ic, 3, gen_U_k1_delays{1, 1}, 1);
+
+x_ic = gen_X_k1_delays{1,2}(:,1);
+X_k2_sim_test2 = Delay_no_kron_Forward_Rollout(gen_dyn_matrices_delays{1,2},...
+    x_ic, 3, gen_U_k1_delays{1, 2}, 2);
+
+x_ic = gen_X_k1_delays{1,10}(:,1);
+X_k2_sim_test10 = Delay_no_kron_Forward_Rollout(gen_dyn_matrices_delays{1,10},...
+    x_ic, 3, gen_U_k1_delays{1, 10}, 10);
+
+x_ic = gen_X_k1_delays{1,20}(:,1);
+X_k2_sim_test20 = Delay_no_kron_Forward_Rollout(gen_dyn_matrices_delays{1,20},...
+    x_ic, 3, gen_U_k1_delays{1, 20}, 20);
+
+%% plot
+
+figure
+plot(gen_time, gen_X_k2(1,:))
+hold on
+plot(gen_X_k2_delays{2,1}, X_k2_sim_test1(1,:))
+plot(gen_X_k2_delays{2,2}, X_k2_sim_test2(1,:))
+plot(gen_X_k2_delays{2,10}, X_k2_sim_test10(1,:))
+plot(gen_X_k2_delays{2,20}, X_k2_sim_test20(1,:))
+%plot(gen_X_k2_delays{2,1}(1,:), gen_X_sim_k2_delays{1,1}(1,:))
+%plot(gen_time, gen_X_sim_k2_delays{1,5}(1,:))
+%plot(gen_time, gen_X_sim_k2_delays{1,10}(1,:))
+ylabel('Jaw 1 Pressure (psi)')
+xlabel('Time (s)')
+%ylim([0 0.5])
+ax = gca;
+ax.FontSize = 22;
+legend('Experimental Data', '1 Time Delay', '2 Time Delay', '10 Time Delay', '20 Time Delay')
+hold off
+
 %% Non-Partitioned Data w/ Time Delay Embedding
 % Generating a variety of time embeddings for the whole spectrum / range of
 % data to generate some A and B dynamics matrices fit to the data. Results
@@ -88,12 +178,15 @@ gen_time = t_start + (0:gen_nm-2)*dt;
 % Time_Delay_Embed(matrix_to_delay, number of delays)
 % parameters to tweak -> number of delays used
 
-delays = 1:8; % some delays to try
+delays = 1:2; % some delays to try
 
 % need to store our different time delay embeddings
 gen_X_k1_delays = cell(1, length(delays));
 gen_X_k2_delays = cell(2, length(delays));
-gen_U_k1_delays = cell(1, length(delays));
+% should not time delay the controls - this cumulative effect should be
+% handled by the time delays on state. Do need to trim the length of the
+% vector so starting indices align with starting index of delayed state vec
+gen_U_k1_delays = cell(1, length(delays)); 
 
 % somewhere to store the dynamics matrices that result from this time delay
 % embedding
@@ -104,8 +197,12 @@ gen_dyn_matrices_delays = cell(2, length(delays));
 for i=1:length(delays)
     gen_X_k1_delays{1, i} = Time_Delay_Embed(gen_X_k1, delays(i));
     gen_X_k2_delays{1, i} = Time_Delay_Embed(gen_X_k2, delays(i));
-    gen_U_k1_delays{1, i} = Time_Delay_Embed(gen_U_k1, delays(i));
     
+    % don't employ time delay embedding on the control input, but we do
+    % need to trim the vector based on qty of delays (ie if 1 delay, first
+    % x_k will be x_2 so similarly we need to update to use u_2 for start)
+    gen_U_k1_delays{1, i} = gen_U_k1(:, delays(i)+1:end);
+
     % each of these respective matrices has a slightly shifted time scale
     % because increasing their quantity of delays shifts their first entry
     % / creates some artificial 'latency'
@@ -117,7 +214,7 @@ for i=1:length(delays)
     [gen_dyn_matrices_delays{1, i}, gen_dyn_matrices_delays{2, i}] = ... 
         Dynamics_Mat_Reg(gen_X_k1_delays{1, i}, ...
         gen_U_k1_delays{1, i}, gen_X_k2_delays{1, i}, ...
-        gen_nx*(delays(i)+1), gen_nu*(delays(i)+1));
+        gen_nx*(delays(i)+1), gen_nu);
 end
 
 %% Build up Hankel Matrices - Obsolete (See Time Delay Embed)
@@ -208,6 +305,7 @@ plot(gen_time, gen_X_sim_k2(1,:))
 %plot(gen_time, gen_X_sim_k2_delays{1,10}(1,:))
 ylabel('Jaw 1 Pressure (psi)')
 xlabel('Time (s)')
+%ylim([0 0.5])
 ax = gca;
 ax.FontSize = 22;
 legend('Experimental Data', '0 Time Delays', '1 Time Delay', '5 Time Delays', '10 Time Delays')
