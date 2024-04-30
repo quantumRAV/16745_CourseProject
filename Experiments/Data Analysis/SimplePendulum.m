@@ -62,12 +62,30 @@ disp(sys.C)
 
 
 %% Fit using homebrew dynamics regression
+gen_nx = 1; % using all three jaw states
+gen_nu = 1; % using a single commanded state
+gen_nm = length(x_RK4(1,:)); % number of measurements = length of first index
+
+gen_X = zeros(gen_nx, gen_nm);
+gen_U = zeros(gen_nu, gen_nm);
+
+gen_X = x_RK4(1,:);
+gen_U(1,:) = u;
+
+
+gen_U_k1 = gen_U(:, 1:end-1);
+gen_X_k1 = gen_X(:, 1:end-1);
+gen_X_k2 = gen_X(:, 2:end);
+
+% Naive A and B, i.e. without any time delays
+[naive_A, naive_B] = Dynamics_Mat_Reg(gen_X_k1, gen_U_k1, gen_X_k2, 1, 1);
+
 
 
 function x_dot = pendulum_dynamics_continuous(x,u,m,g,l)
     x_dot=zeros(2,1);
     x_dot(1) = x(2); %velocity kinematics
-    x_dot(2) = -(g/l)*sin(x(1)) + m*(l^2)*u; %continuous pendulum dynamics
+    x_dot(2) = -(g/l)*sin(x(1)) + u./(m*(l^2)); %continuous pendulum dynamics
 end
 
 function xk_1 = RK4(f, x, u, dt)
