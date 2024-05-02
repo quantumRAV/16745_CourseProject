@@ -22,42 +22,53 @@ X1_sim(:, 1) = xic;
 
 % unpack the dynamics matrices into easier structures to iterate through
 B_tilde = dynamics_matrices(1:nx, 1:nu);
+A_tilde = dynamics_matrices(1:nx, nu+1:end);
 
-for k=1:nm-1
+% flow dynamics through and propogate answers to time embedded sim matrix
+% up through the second to last column of X (ie nm-1 in this function)
+for k=1:nm    
+    % x_k+1 = B*u_k + A*x_k
+    X2_sim(:,k) = B_tilde*U_traj(:,k) + A_tilde*(X1_sim(:,k)); 
+
     % x_k+1 += B*u_k
-    X2_sim(:,k) = X2_sim(:,k) + B_tilde*U_traj(:,k);
-    for i = 1:p+1
-        % A_1 => cols 2:4, A_2 => cols 5:7, A_3 => cols 8:10, etc
-        start_idx = nu+1+(i-1)*nx;
-        A_i = dynamics_matrices(1:nx, start_idx:start_idx+nx-1);
-        
-        % x_k rows 1:3, x_k-1 rows 4:6, x_k-2 rows 7:9, etc
-        start_idx = (i-1)*nx+1; %same as before but shifted 1 step forward
-
-        % x_k+1 += A1*x_k + A2*x_k-1 + A3*x_k-2 + ...
-        X2_sim(:,k) = X2_sim(:,k) + A_i*X1_sim(start_idx:start_idx+nx-1, k);
-    end
+%     X2_sim(:,k) = X2_sim(:,k) + B_tilde*U_traj(:,k);
+%     for i = 1:p+1
+%         % A_1 => cols 2:4, A_2 => cols 5:7, A_3 => cols 8:10, etc
+%         start_idx = nu+1+(i-1)*nx;
+%         A_i = dynamics_matrices(1:nx, start_idx:start_idx+nx-1);
+%         
+%         % x_k rows 1:3, x_k-1 rows 4:6, x_k-2 rows 7:9, etc
+%         start_idx = (i-1)*nx+1; %same as before but shifted 1 step forward
+% 
+%         % x_k+1 += A1*x_k + A2*x_k-1 + A3*x_k-2 + ...
+%         X2_sim(:,k) = X2_sim(:,k) + A_i*X1_sim(start_idx:start_idx+nx-1, k);
+%     end
+    
     % x_k+1 is now solved for, need to build up the subsequent column of
     % X_k
-    X1_sim(1:nx, k+1) = X2_sim(:,k);
-    X1_sim(nx+1:end, k+1) = X1_sim(1:p*nx, k);
-
+    if(k < nm)
+        X1_sim(1:nx, k+1) = X2_sim(:,k);
+        X1_sim(nx+1:end, k+1) = X1_sim(1:p*nx, k);
+    end
+    
 end
 
 % need to solve the terminal term
 % x_m += B*u_m-1
-X2_sim(:,end) = X2_sim(:,end) + B_tilde*U_traj(:,end);
-for i = 1:p
-    % A_1 => cols 2:4, A_2 => cols 5:7, A_3 => cols 8:10, etc
-    start_idx = nu+1+(i-1)*nx;
-    A_i = dynamics_matrices(1:nx, start_idx:start_idx+nx-1);
-    
-    % x_k rows 1:3, x_k-1 rows 4:6, x_k-2 rows 7:9, etc
-    start_idx = (i-1)*nx+1; %same as before but shifted 1 step forward
+%X2_sim(:,end) = B_tilde*U_traj(:,end) + A_tilde*(X1_sim(:,end));
 
-    % x_k+1 += A1*x_m-1 + A2*x_m-2 + A3*x_m-3 + ...
-    X2_sim(:,end) = X2_sim(:,end) + A_i*X1_sim(start_idx:start_idx+nx-1, end);
-end
+% dumb way to get final term
+% for i = 1:p
+%     % A_1 => cols 2:4, A_2 => cols 5:7, A_3 => cols 8:10, etc
+%     start_idx = nu+1+(i-1)*nx;
+%     A_i = dynamics_matrices(1:nx, start_idx:start_idx+nx-1);
+%     
+%     % x_k rows 1:3, x_k-1 rows 4:6, x_k-2 rows 7:9, etc
+%     start_idx = (i-1)*nx+1; %same as before but shifted 1 step forward
+% 
+%     % x_k+1 += A1*x_m-1 + A2*x_m-2 + A3*x_m-3 + ...
+%     X2_sim(:,end) = X2_sim(:,end) + A_i*X1_sim(start_idx:start_idx+nx-1, end);
+% end
 
 end
 
