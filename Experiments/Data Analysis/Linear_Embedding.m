@@ -1,7 +1,7 @@
 format long
 
-%% For the 1st set of data collected in early April
-dt = readtable("Koopman Data/Modified_Data.xlsx");
+%% For the 1st set of data collected in early April, rigid 40 mm cylinder
+dt = readtable("Koopman Data/Koopman_Testing_06_04_2024_10_04_48_rigid40.xlsx");
 
 
 u = dt{:,{'commanded_closure_pressure_psi','commanded_x_mm','commanded_y_mm'}};
@@ -29,9 +29,9 @@ hsv = hsvd(sys)
 
 
 
-%% For the 2nd set of data collected on April 30th, just in contact
+%% For the 2nd set of data collected on April 30th, just in contact, rigid 40 mm cylinder
 
-dt = readtable("Koopman Data/Koopman_Testing_30_04_2024_17_07_00_modified.xlsx");
+dt = readtable("Koopman Data/Koopman_Testing_30_04_2024_17_07_00_modified_40mm_rigid_contact.xlsx");
 
 
 u = dt{:,{'commanded_closure_pressure_psi','commanded_x_mm','commanded_y_mm'}};
@@ -99,4 +99,36 @@ plot(t,y_matlab(:,1),'r--')
 plot(t,y_actual(1,:),'m-.')
 legend();
 
+%% For the 3rd set of data collected on May3rd, just in contact, elastic Ecoflex 00-30 40 mm cylinder
 
+dt = readtable("Koopman Data/Koopman_Testing_03_05_2024_19_30_51_Elastic40.xlsx");
+
+
+u = dt{:,{'commanded_closure_pressure_psi','commanded_x_mm','commanded_y_mm'}};
+y =  dt{:,{'P_jaw1_psi','P_jaw2_psi','P_jaw3_psi'}};
+
+
+nx = 1:20;
+[sys, x0] = n4sid(u,y,nx,'Ts',1/16);
+
+figure()
+compare(u,y,sys);
+
+[ymod,fit,ic] = compare(u,y,sys);
+
+co = ctrb(sys)
+disp("Rank of controllability matrix: ")
+disp(rank(co))
+disp("uncontrollable states:")
+disp(length(sys.A)-rank(co))
+
+
+obv = obsv(sys);
+disp("Rank of observability matrix: ")
+disp(rank(obv))
+
+% Check svd
+hsv = hsvd(sys)
+
+% Initial condition
+sys.x0
