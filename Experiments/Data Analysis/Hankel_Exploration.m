@@ -301,7 +301,13 @@ plot(gen_X_k2t, gen_X_k2(1,:),'r--',DisplayName="Exp Data")
 % think this is an important distinction given reliance on time embedding
 % continuity.
 
-
+%% SVD Matrices for Each Time Embedded Sys
+% row 1 = U, row 2 = S, row 3 = V
+svd_mats = cell(3, length(delays));
+for i=1:length(delays)
+    % [U, S, V] = svd(A, "econ") yields A = U*S*V'
+    [svd_mats{1, i}, svd_mats{2, i}, svd_mats{3, i}] = svd(exp2_X_delays{1, i}, "econ", "vector");
+end
 
 %% Build up Hankel Matrices - Obsolete (See Time Delay Embed)
 % Zach's explanation aligns with Haggerty paper that suggests an altered
