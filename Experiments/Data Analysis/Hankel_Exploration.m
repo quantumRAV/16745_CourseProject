@@ -132,6 +132,7 @@ naive_A2 = dynamics_matrix2(:, nu+1:end);
 % parameters to tweak -> number of delays used
 
 delays = 1:20; % some delays to try
+delays = [delays, 30, 40, 50, 75, 100];
 
 % cell matrices to store x_k, x_k+1, u_k, [B A_i] for all tested delays
 % first row = x_k, second row = x_k+1
@@ -146,6 +147,11 @@ exp2_X_delays = cell(5, length(delays));
 exp2_U_delays = cell(1, length(delays)); 
 exp2_dyn_matrices_delays = cell(1, length(delays));
 
+% using these to see if a pinv will yield a dif soln than linsolve
+exp2_X_delays_inv = cell(5, length(delays));
+exp2_U_delays_inv = cell(1, length(delays)); 
+exp2_dyn_matrices_delays_inv = cell(1, length(delays));
+
 errors2 = zeros(1, length(delays));
 
 % generate time delay embedded matrices for varying delays
@@ -153,6 +159,7 @@ for i=1:length(delays)
     % x_k gets time delays baked into it
     gen_X_delays{1, i} = Time_Delay_Embed(gen_X_k1, delays(i));
     exp2_X_delays{1, i} = Time_Delay_Embed(exp2_X_k1, delays(i));
+    exp2_X_delays_inv{1, i} = Time_Delay_Embed(exp2_X_k1, delays(i)); % same data as linsolve
     
     % x_k2, u_k, & time just get trimmed so their length/entries stay in
     % alignment
@@ -163,15 +170,19 @@ for i=1:length(delays)
 
     exp2_U_delays{1, i} = exp2_U_k1(:, delays(i)+1:end);
     exp2_X_delays{2, i} = exp2_X_k2(:, delays(i)+1:end);
-    exp2_X_delays{4, i} = exp2_X_k2t(:,delays(i)+1:end);    
+    exp2_X_delays{4, i} = exp2_X_k2t(:,delays(i)+1:end);
+
+    exp2_U_delays_inv{1, i} = exp2_U_k1(:, delays(i)+1:end);
+    exp2_X_delays_inv{2, i} = exp2_X_k2(:, delays(i)+1:end);
+    exp2_X_delays_inv{4, i} = exp2_X_k2t(:,delays(i)+1:end);
     
     % stack controls and state for regression
     state_ctrl = [gen_U_delays{1, i}; gen_X_delays{1, i}];
-    state_ctrl2 = [exp2_U_delays{1, i}; exp2_X_delays{1, i}];
+    state_ctrl2 = [exp2_U_delays{1, i}; exp2_X_delays{1, i}]; % can use this still for pinv
     
     % linear regression step
-    gen_dyn_matrices_delays{1, i} = linsolve(state_ctrl',gen_X_delays{2,i}')';
-    exp2_dyn_matrices_delays{1, i} = linsolve(state_ctrl2',exp2_X_delays{2,i}')';
+    gen_dyn_matrices_delays{1, i} = gen_X_delays{2,i}*pinv(state_ctrl);
+    exp2_dyn_matrices_delays{1, i} = exp2_X_delays{2,i}*pinv(state_ctrl2);
 
     % rolling the system out
     init_cond = gen_X_delays{1, i}(:,1);
@@ -231,6 +242,7 @@ plot(exp2_X_delays{4,1}, exp2_X_delays{3,1}(1,:), DisplayName="1 Delay")
 plot(exp2_X_delays{4,5}, exp2_X_delays{3,5}(1,:), DisplayName="5 Delays")
 plot(exp2_X_delays{4,8}, exp2_X_delays{3,8}(1,:), DisplayName="8 Delays")
 plot(exp2_X_delays{4,20}, exp2_X_delays{3,20}(1,:), DisplayName="20 Delays")
+plot(exp2_X_delays{4,25}, exp2_X_delays{3,25}(1,:), DisplayName="100 Delays")
 
 % visualize some of the general data from 40 cm cylinder experiment
 figure(5)
@@ -308,6 +320,38 @@ for i=1:length(delays)
     % [U, S, V] = svd(A, "econ") yields A = U*S*V'
     [svd_mats{1, i}, svd_mats{2, i}, svd_mats{3, i}] = svd(exp2_X_delays{1, i}, "econ", "vector");
 end
+
+figure(8)
+svd_eigen_plot = tiledlayout(4, 1, "TileSpacing","tight");
+
+% overall label options
+title(svd_eigen_plot, 'Eigenvalue Relative Correlation Across Delays (Grasper Data)')
+xlabel(svd_eigen_plot, 'SVD Eigenvalue ($\sigma_i$)', 'Interpreter', 'latex')
+ylabel(svd_eigen_plot, '$\sigma_i$ / $\sum\sigma$', 'Interpreter','latex')
+
+% Tile 1
+nexttile
+plot(svd_mats{2,1}/sum(svd_mats{2,1}), '-o')
+title("1 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 2
+nexttile
+plot(svd_mats{2,5}/sum(svd_mats{2,5}), '-o')
+title("5 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 3
+nexttile
+plot(svd_mats{2,10}/sum(svd_mats{2,10}), '-o')
+title("10 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 4
+nexttile
+plot(svd_mats{2,20}/sum(svd_mats{2,11}), '-o')
+title("20 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
 
 %% Build up Hankel Matrices - Obsolete (See Time Delay Embed)
 % Zach's explanation aligns with Haggerty paper that suggests an altered
