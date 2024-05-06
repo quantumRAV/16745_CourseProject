@@ -41,7 +41,7 @@ ylabel('Angular velocity, $\dot{\theta}$ (rad/s))', 'Interpreter','latex')
 
 %% fit linear model to pendulum data using N4sid, and compare the A and B matrices
 figure(2)
-nx = 1:5; %model order
+nx = 1:10; %model order
 sys = n4sid(u.',x_RK4(1,:).', nx, 'Ts', dt);
 
 compare(u.',x_RK4(1,:).',sys);
@@ -60,6 +60,28 @@ disp(sys.B)
 disp("C:")
 disp(sys.C)
 
+% Rollout the data from n4sid to put it into a matrix form for plotting
+n4_sim_results = zeros(1, length(u));
+
+% init position of y is the first position of x_0
+y_k = x_RK4(1,1); 
+for i=1:length(u)
+    x_k = pinv(sys.C)*y_k;
+    x_k2 = sys.A*x_k + sys.B*u(i);
+    
+    % update y_k with this updated timestep for next loop and add it to
+    % results
+    y_k = sys.C*x_k2; % y_k effectively now y_k+1 for next loop
+    n4_sim_results(1,i) = y_k;
+end
+
+figure(5)
+legend
+hold on
+xlabel('Time (s)')
+ylabel('Angular position, $\theta$ (rad)', 'Interpreter','latex')
+plot(t, n4_sim_results, DisplayName="N4sid Matrix Rollout")
+plot(t, x_RK4(1,:), '--', DisplayName="RK4 Pendulum Dynamics")
 
 %% Fit using homebrew dynamics regression
 nx = 1; % theta
@@ -139,7 +161,7 @@ for i=1:length(test_delays)
     state_ctrl = [U_delays{1, i}; X_delays{1, i}];
 
     % regression step
-    dyn_mat_delays{1, i} = linsolve(state_ctrl', X_delays{2,i}')';
+    dyn_mat_delays{1, i} = X_delays{2,i}*pinv(state_ctrl);
 
     % rolling the system out
     init_cond = X_delays{1, i}(:,1);
@@ -168,9 +190,48 @@ xlabel('Number of Time Delays')
 ylabel('RMSE with Actual Data')
 plot(test_delays, errors, '-o')
 
-figure(2)
-plot(X_delays{4, 3}, X_delays{3,3},'--o', DisplayName = "3 Delay");
-plot(X_delays{4, 2}, X_delays{3,2},'--o', DisplayName = "2 Delay")
+%figure(2)
+%plot(X_delays{4, 3}, X_delays{3,3},'--o', DisplayName = "3 Delay");
+%plot(X_delays{4, 2}, X_delays{3,2},'--o', DisplayName = "2 Delay")
+
+%% Looking at SVD side
+svd_mats = cell(3, length(test_delays));
+for i=1:length(test_delays)
+    % [U, S, V] = svd(A, "econ") yields A = U*S*V'
+    [svd_mats{1, i}, svd_mats{2, i}, svd_mats{3, i}] = svd(X_delays{1, i}, "econ", "vector");
+end
+
+figure(8)
+svd_eigen_plot = tiledlayout(4, 1, "TileSpacing","tight");
+
+% overall label options
+title(svd_eigen_plot, 'Eigenvalue Relative Correlation Across Delays (Pendulum Simulation)')
+xlabel(svd_eigen_plot, 'SVD Eigenvalue ($\sigma_i$)', 'Interpreter', 'latex')
+ylabel(svd_eigen_plot, '$\sigma_i$ / $\sum\sigma$', 'Interpreter','latex')
+
+% Tile 1
+nexttile
+plot(svd_mats{2,1}/sum(svd_mats{2,1}), '-o')
+title("1 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 2
+nexttile
+plot(svd_mats{2,5}/sum(svd_mats{2,5}), '-o')
+title("5 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 3
+nexttile
+plot(svd_mats{2,10}/sum(svd_mats{2,10}), '-o')
+title("10 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
+
+% Tile 4
+nexttile
+plot(svd_mats{2,11}/sum(svd_mats{2,11}), '-o')
+title("20 Delay SVD Eigenvalue Correlation")
+xlim([0, 10])
 
 %% Dynamics and integration functions
 function x_dot = pendulum_dynamics_continuous(x,u,m,g,l)
