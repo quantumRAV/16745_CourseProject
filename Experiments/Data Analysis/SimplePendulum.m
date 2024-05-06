@@ -12,6 +12,7 @@ l = 0.3; %m
 dt = 0.05; %time step in seconds
 N = 1000; %total number of steps to simulate
 t = [1:N]*dt;
+t = [0, t(1:end-1)];
 
 x0 = [pi/2;0]; %zero initial conditions. 1st element is the position, 2nd is the velocity
 u = zeros(1,N); %No applied torque
@@ -60,28 +61,33 @@ disp(sys.B)
 disp("C:")
 disp(sys.C)
 
-% Rollout the data from n4sid to put it into a matrix form for plotting
-n4_sim_results = zeros(1, length(u));
+% built matlab in rollout
+y_matlab = lsim(sys,u,t,sys.x0);
 
-% init position of y is the first position of x_0
-y_k = x_RK4(1,1); 
-for i=1:length(u)
-    x_k = pinv(sys.C)*y_k;
-    x_k2 = sys.A*x_k + sys.B*u(i);
-    
-    % update y_k with this updated timestep for next loop and add it to
-    % results
-    y_k = sys.C*x_k2; % y_k effectively now y_k+1 for next loop
-    n4_sim_results(1,i) = y_k;
-end
+n4sid_error = rmse(y_matlab', x_RK4(1,:));
+
+% % Rollout the data from n4sid to put it into a matrix form for plotting
+% n4_sim = zeros(length(sys.x0), length(u)+1);
+% y_sim = zeros(1, length(u));
+% 
+% % init position
+% n4_sim(:,1) = sys.x0; 
+% for i=1:length(u)
+%     n4_sim(:,i+1) = sys.A*n4_sim(:,i) + sys.B*u(i);
+% 
+%     % update y_k with this step in observer space
+%     y_sim(:,i) = sys.C*n4_sim(:,i+1);
+% end
 
 figure(5)
 legend
 hold on
 xlabel('Time (s)')
 ylabel('Angular position, $\theta$ (rad)', 'Interpreter','latex')
-plot(t, n4_sim_results, DisplayName="N4sid Matrix Rollout")
-plot(t, x_RK4(1,:), '--', DisplayName="RK4 Pendulum Dynamics")
+plot(t, x_RK4(1,:), 'r--', DisplayName="RK4 Pendulum Dynamics")
+%N4_timescale = [1:N]*dt;
+%plot(N4_timescale, y_sim(1,:), 'b--.', DisplayName="N4sid Matrix Rollout")
+plot(t,y_matlab(:,1), 'b--.', DisplayName="N4sid Rollout")
 
 %% Fit using homebrew dynamics regression
 nx = 1; % theta
@@ -134,7 +140,7 @@ sim_t = t(:,2:end);
 %% Test some time delay embedding
 
 % some sample delay quantities
-test_delays = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50];
+test_delays = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20];
 
 % cell matrices to store x_k, x_k+1, u_k, [B A_i] for all tested delays
 % first row = x_k, second row = x_k+1
@@ -185,10 +191,30 @@ plot(X_delays{4, 1}, X_delays{3,1},'b-', DisplayName = "1 Delay");
 plot(X_delays{4, 3}, X_delays{3,3},'g--', DisplayName = "3 Delay");
 
 figure(4)
+pendulum_error_plots = tiledlayout(2, 1, "TileSpacing","tight");
+
+%tile 1
+nexttile
+plot(X_delays{4, 3}, X_delays{3,3},'g--o', DisplayName = "3 Embedded Delay Rollout")
 hold on
+plot(t, x_RK4(1,:), 'r-', DisplayName="RK4 Pendulum Dynamics")
+plot(t,y_matlab(:,1), 'b--.', DisplayName="N4sid Rollout")
+xlim([0, 5])
+title("Pendulum Simulated Position")
+xlabel('Time (s)')
+ylabel('Angular Position, $\theta$ (rad)', 'Interpreter','latex')
+legend
+
+%tile 2
+nexttile
+plot(test_delays, errors, '-o', DisplayName="Time Delay Embedding RMSE Error")
+hold on
+plot([0, 20], [n4sid_error, n4sid_error], 'r--', DisplayName="N4sid RMSE")
+xlim([0, 20])
+title("RMSE as a Function of Embedded Time Delays")
 xlabel('Number of Time Delays')
 ylabel('RMSE with Actual Data')
-plot(test_delays, errors, '-o')
+legend
 
 %figure(2)
 %plot(X_delays{4, 3}, X_delays{3,3},'--o', DisplayName = "3 Delay");
